@@ -1,0 +1,7 @@
+[package]
+name = "kube-exec"
+version = "0.0.1"
+authors = ["Stanislav Lapata <stanislavlapata@gmail.com>"]
+
+[dependencies]
+clap = "2.31.2"

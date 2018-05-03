@@ -1,0 +1,57 @@
+#compdef kube-exec
+
+__namespaces () {
+  local -a _namespaces
+  _namespaces=($(kube-exec -n))
+  typeset -U _namespaces
+  _describe 'namespaces' _namespaces
+}
+
+
+__pode_names() {
+  local -a _pode_names
+  _pode_names=($(kube-exec -p $words[1]))
+  typeset -U _pode_names
+  _describe 'pode_names' _pode_names
+}
+
+__commands() {
+  local -a _commands
+  _commands=(
+  'bash:bash'
+  'sh:sh'
+  'ash:ash'
+  )
+  typeset -U _commands
+  _describe 'commands' _commands
+}
+
+_kube_exec() {
+
+
+  _arguments \
+    "1: :{__namespaces}" \
+    '*:: :->args'
+
+    case $state in
+    args)
+
+      _arguments \
+        "1: :{__pode_names}" \
+        '*:: :->args'
+
+      case $state in
+      args)
+
+        _arguments \
+          "1: :{__commands}"
+        ;;
+      esac
+      ;;
+    esac
+}
+
+
+_kube_exec
+
+
