@@ -5,7 +5,7 @@ use get_pod_names;
 use std::{path::PathBuf, process::exit};
 
 fn get_matches() -> ArgMatches<'static> {
-  App::new("kube-exec")
+  App::new("kube-pod-connect")
     .version("0.0.1")
     .about("Kubernetes exec to pod")
     .author("Stanislav Lapata <stanislavlapata@gmail.com>")

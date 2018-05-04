@@ -1,5 +1,5 @@
 [package]
-name = "kube-exec"
+name = "kube-pod-connect"
 version = "0.0.1"
 authors = ["Stanislav Lapata <stanislavlapata@gmail.com>"]
 

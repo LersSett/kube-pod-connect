@@ -28,7 +28,7 @@ impl<'a> fmt::Display for Raw<'a> {
 
 fn main() {
   let home_dir = env::home_dir().unwrap_or(Path::new("/root").to_path_buf());
-  let kube_exec_dir = home_dir.join(".kube-exec");
+  let kube_exec_dir = home_dir.join(".kube-pod-connect");
 
   cli::run(kube_exec_dir);
 }

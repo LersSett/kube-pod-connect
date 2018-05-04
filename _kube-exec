@@ -1,8 +1,12 @@
-#compdef kube-exec
+#compdef kube-pod-connect
 
 __namespaces () {
   local -a _namespaces
-  _namespaces=($(kube-exec -n))
+  if [[ " ${words[*]} " == *" -f "* ]]; then
+    _namespaces=($(kube-pod-connect -f -n))
+  else
+    _namespaces=($(kube-pod-connect -n))
+  fi
   typeset -U _namespaces
   _describe 'namespaces' _namespaces
 }
@@ -10,7 +14,8 @@ __namespaces () {
 
 __pod_names() {
   local -a _pod_names
-  _pod_names=($(kube-exec -p $words[1]))
+  # TODO: no cache if flag --force
+  _pod_names=($(kube-pod-connect -p $words[1]))
   typeset -U _pod_names
   _describe 'pod_names' _pod_names
 }
