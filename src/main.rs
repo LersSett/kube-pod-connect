@@ -2,89 +2,126 @@ extern crate clap;
 
 mod cli;
 
-use std::process::{exit, Command};
+use std::{
+  env,
+  fmt,
+  fs::{self, File},
+  io::{Error, Read, Write},
+  path::{Path, PathBuf},
+  process::{Command, Output},
+  str
+};
 
-fn main() {
-  let matches = cli::args();
-  if matches.is_present("namespaces") {
-    get_namespaces()
-  }
+pub struct Raw<'a>(pub Vec<&'a str>);
 
-  if matches.is_present("pode_names") {
-    let namespace = matches.value_of("pode_names").unwrap();
-    get_pode_names(namespace)
-  }
+impl<'a> fmt::Display for Raw<'a> {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    let mut res = String::new();
 
-  match matches.value_of("NAMESPACE") {
-    Some(namespace) =>
-      match matches.value_of("PODE") {
-        Some(pode) =>
-          match matches.value_of("COMMAND") {
-            Some(command) => {
-              let result = Command::new("kubectl")
-                .arg("-n")
-                .arg(namespace)
-                .arg("-ti")
-                .arg("exec")
-                .arg(pode)
-                .arg(command)
-                .spawn();
+    for ns in self.0.iter() {
+      res.push_str(&format!("{}\n", ns))
+    }
 
-              match result {
-                Ok(child) => child.wait_with_output().expect("failed to wait on child"),
-                Err(error) => panic!("{:?}", error)
-              };
-            },
-            None => panic!("{:?}", "Instance name is required")
-          },
-        None => panic!("{:?}", "Instance name is required")
-      },
-    None => exit(0)
+    write!(f, "{}", res)
   }
 }
 
-fn get_namespaces() {
-  let result = Command::new("kubectl")
-    .arg("get")
-    .arg("ns")
-    .arg("-o")
-    .arg("custom-columns=NAME:.metadata.name")
-    .output();
+fn main() {
+  let home_dir = env::home_dir().unwrap_or(Path::new("/root").to_path_buf());
+  let kube_exec_dir = home_dir.join(".kube-exec");
 
-  match result {
-    Ok(raw_namespaces) => {
-      let mut parsed = std::str::from_utf8(&raw_namespaces.stdout)
-        .unwrap()
-        .split_whitespace()
-        .collect::<Vec<&str>>();
-      parsed.drain(0..1);
+  cli::run(kube_exec_dir);
+}
 
-      println!("{}", cli::Raw(parsed))
-    },
-    Err(err) => panic!("{:?}", err)
+fn get_namespaces(kube_exec_dir: &PathBuf, force: bool) {
+  if !force && kube_exec_dir.join("namespaces").exists() {
+    let contents = read_file(kube_exec_dir.join("namespaces"));
+
+    println!("{}", contents);
+  } else {
+    let result = Command::new("kubectl")
+      .arg("--no-headers=true")
+      .arg("-o")
+      .arg("custom-columns=NAME:.metadata.name")
+      .arg("get")
+      .arg("ns")
+      .output();
+
+    parse_and_write(result, kube_exec_dir, "namespaces");
+  }
+}
+
+fn get_pod_names(kube_exec_dir: &PathBuf, namespace: &str, force: bool) {
+  if !force && kube_exec_dir.join(namespace).exists() {
+    let contents = read_file(kube_exec_dir.join(namespace));
+
+    println!("{}", contents);
+  } else {
+    let result = Command::new("kubectl")
+      .arg("-n")
+      .arg(namespace)
+      .arg("-o")
+      .arg("custom-columns=NAME:.metadata.name")
+      .arg("--field-selector=status.phase=Running")
+      .arg("--no-headers=true")
+      .arg("get")
+      .arg("po")
+      .output();
+
+    parse_and_write(result, kube_exec_dir, namespace);
+  }
+}
+
+fn read_file(path: PathBuf) -> String {
+  let mut file = File::open(path).unwrap();
+  let mut contents = String::new();
+  file
+    .read_to_string(&mut contents)
+    .expect("something went wrong reading the file");
+  contents
+}
+
+fn write_file(path: PathBuf, data: String) {
+  match File::create(path) {
+    Ok(mut file) =>
+      match file.write_all(data.as_bytes()) {
+        Ok(_result) => (),
+        Err(error) => panic!("{:?}", error)
+      },
+    Err(error) => panic!("{}", error)
   };
 }
 
-fn get_pode_names(namespace: &str) {
-  let result = Command::new("kubectl")
-    .arg("-n")
-    .arg(namespace)
-    .arg("get")
-    .arg("po")
-    .arg("-o")
-    .arg("custom-columns=NAME:.metadata.name")
-    .output();
-
+fn parse_and_write(result: Result<Output, Error>, kube_exec_dir: &PathBuf, file_name: &str) {
   match result {
-    Ok(raw_namespaces) => {
-      let mut parsed = std::str::from_utf8(&raw_namespaces.stdout)
+    Ok(output) => {
+      let mut parsed = str::from_utf8(&output.stdout)
         .unwrap()
         .split_whitespace()
         .collect::<Vec<&str>>();
-      parsed.drain(0..1);
+      let data = Raw(parsed);
 
-      println!("{}", cli::Raw(parsed))
+      fs::create_dir_all(kube_exec_dir.clone()).expect("Dir not created");
+      write_file(kube_exec_dir.join(file_name), format!("{}", data));
+
+      println!("{}", data)
     },
-    Err(err) => panic!("{:?}", err)
+    Err(error) => panic!("{}", error)
+  };
+}
+
+fn connect(namespace: &str, pod: &str, command: &str) {
+  let result = Command::new("kubectl")
+    .arg("-n")
+    .arg(namespace)
+    .arg("-ti")
+    .arg("exec")
+    .arg(pod)
+    .args(command.split(" "))
+    .spawn();
+
+  match result {
+    Ok(child) => child.wait_with_output().expect("failed to wait on child"),
+    Err(error) => panic!("{}", error)
   };
 }

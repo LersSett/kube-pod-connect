@@ -8,11 +8,11 @@ __namespaces () {
 }
 
 
-__pode_names() {
-  local -a _pode_names
-  _pode_names=($(kube-exec -p $words[1]))
-  typeset -U _pode_names
-  _describe 'pode_names' _pode_names
+__pod_names() {
+  local -a _pod_names
+  _pod_names=($(kube-exec -p $words[1]))
+  typeset -U _pod_names
+  _describe 'pod_names' _pod_names
 }
 
 __commands() {
@@ -27,9 +27,10 @@ __commands() {
 }
 
 _kube_exec() {
-
-
   _arguments \
+    {-f,--force}'[Force update namespace or pod list]' \
+    {-n,--namespaces}'[List namespaces]' \
+    {-p,--pod-names}'[Pod names for namespace]:namespace:__namespaces' \
     "1: :{__namespaces}" \
     '*:: :->args'
 
@@ -37,7 +38,7 @@ _kube_exec() {
     args)
 
       _arguments \
-        "1: :{__pode_names}" \
+        "1: :{__pod_names}" \
         '*:: :->args'
 
       case $state in
