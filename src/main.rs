@@ -3,13 +3,7 @@ extern crate clap;
 mod cli;
 
 use std::{
-  env,
-  fmt,
-  fs::{self, File},
-  io::{Error, Read, Write},
-  path::{Path, PathBuf},
-  process::{Command, Output},
-  str
+  env, fmt, fs::{self, File}, io::{Read, Write}, path::{Path, PathBuf}, process::{Command, Output}, str
 };
 
 pub struct Raw<'a>(pub Vec<&'a str>);
@@ -47,29 +41,47 @@ fn get_namespaces(kube_exec_dir: &PathBuf, force: bool) {
       .arg("ns")
       .output();
 
-    parse_and_write(result, kube_exec_dir, "namespaces");
+    let namespaces = match result {
+      Ok(Output { ref stdout, .. }) => {
+        let mut parsed = str::from_utf8(stdout)
+          .unwrap()
+          .split_whitespace()
+          .collect::<Vec<&str>>();
+        Raw(parsed)
+      },
+      Err(error) => panic!("{}", error)
+    };
+
+    fs::create_dir_all(kube_exec_dir.clone()).expect("Dir not created");
+    write_file(kube_exec_dir.join("namespaces"), format!("{}", namespaces));
+
+    println!("{}", namespaces)
   }
 }
 
-fn get_pod_names(kube_exec_dir: &PathBuf, namespace: &str, force: bool) {
-  if !force && kube_exec_dir.join(namespace).exists() {
-    let contents = read_file(kube_exec_dir.join(namespace));
+fn get_pod_names(namespace: &str) {
+  let result = Command::new("kubectl")
+    .arg("-n")
+    .arg(namespace)
+    .arg("-o")
+    .arg("custom-columns=NAME:.metadata.name")
+    .arg("--field-selector=status.phase=Running")
+    .arg("--no-headers=true")
+    .arg("get")
+    .arg("po")
+    .output();
 
-    println!("{}", contents);
-  } else {
-    let result = Command::new("kubectl")
-      .arg("-n")
-      .arg(namespace)
-      .arg("-o")
-      .arg("custom-columns=NAME:.metadata.name")
-      .arg("--field-selector=status.phase=Running")
-      .arg("--no-headers=true")
-      .arg("get")
-      .arg("po")
-      .output();
-
-    parse_and_write(result, kube_exec_dir, namespace);
-  }
+  let pod_names = match result {
+    Ok(Output { ref stdout, .. }) => {
+      let mut parsed = str::from_utf8(stdout)
+        .unwrap()
+        .split_whitespace()
+        .collect::<Vec<&str>>();
+      Raw(parsed)
+    },
+    Err(error) => panic!("{}", error)
+  };
+  println!("{}", pod_names);
 }
 
 fn read_file(path: PathBuf) -> String {
@@ -88,24 +100,6 @@ fn write_file(path: PathBuf, data: String) {
         Ok(_result) => (),
         Err(error) => panic!("{:?}", error)
       },
-    Err(error) => panic!("{}", error)
-  };
-}
-
-fn parse_and_write(result: Result<Output, Error>, kube_exec_dir: &PathBuf, file_name: &str) {
-  match result {
-    Ok(output) => {
-      let mut parsed = str::from_utf8(&output.stdout)
-        .unwrap()
-        .split_whitespace()
-        .collect::<Vec<&str>>();
-      let data = Raw(parsed);
-
-      fs::create_dir_all(kube_exec_dir.clone()).expect("Dir not created");
-      write_file(kube_exec_dir.join(file_name), format!("{}", data));
-
-      println!("{}", data)
-    },
     Err(error) => panic!("{}", error)
   };
 }

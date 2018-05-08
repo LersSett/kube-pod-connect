@@ -6,7 +6,7 @@ use std::{path::PathBuf, process::exit};
 
 fn get_matches() -> ArgMatches<'static> {
   App::new("kube-pod-connect")
-    .version("0.0.1")
+    .version("0.0.2")
     .about("Kubernetes exec to pod")
     .author("Stanislav Lapata <stanislavlapata@gmail.com>")
     .arg(
@@ -56,7 +56,7 @@ pub fn run(kube_exec_dir: PathBuf) {
 
   if matches.is_present("pod_names") {
     let namespace = matches.value_of("pod_names").unwrap();
-    get_pod_names(&kube_exec_dir, namespace, matches.is_present("force"))
+    get_pod_names(namespace)
   }
 
   match matches.value_of("NAMESPACE") {

@@ -2,7 +2,7 @@
 
 __namespaces () {
   local -a _namespaces
-  if [[ " ${words[*]} " == *" -f "* ]]; then
+  if [[ " ${words[*]} " == *" -f "* ]] || [[ " ${words[*]} " == *" --force "* ]]; then
     _namespaces=($(kube-pod-connect -f -n))
   else
     _namespaces=($(kube-pod-connect -n))
